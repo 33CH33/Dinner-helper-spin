@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>晚餐推薦小幫手 V4</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/winwheel@2.7.0/Winwheel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f2f2f7;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 480px;
+      margin: auto;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #007aff;
+      margin-bottom: 20px;
+    }
+    .card {
+      background-color: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    select, button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      margin-top: 10px;
+      border-radius: 12px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #007aff;
+      color: white;
+      border: none;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .checkbox-group label {
+      background-color: #f0f0f0;
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    input[type="checkbox"] {
+      margin-right: 5px;
+    }
+    .result, .slot-result {
+      margin-top: 15px;
+      text-align: center;
+      font-size: 18px;
+    }
+    a.link {
+      display: block;
+      margin-top: 8px;
+      color: #007aff;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .slot-box {
+      height: 40px;
+      overflow: hidden;
+      background-color: #fff;
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+      line-height: 40px;
+      margin-top: 10px;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto 20px auto;
+      background: #fff;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>晚餐推薦小幫手</h1>
+
+  <div class="card">
+    <div class="section-title">🔍 按類型推薦</div>
+    <label for="cuisine">選擇料理類型：</label>
+    <select id="cuisine">
+      <option value="中餐">中餐</option>
+      <option value="西餐">西餐</option>
+      <option value="日式">日式</option>
+      <option value="韓式">韓式</option>
+      <option value="泰式">泰式</option>
+      <option value="甜點">甜點</option>
+      <option value="小吃">小吃</option>
+      <option value="速食">速食</option>
+    </select>
+    <div class="section-title" style="margin-top:20px;">❌ 不想吃的：</div>
+    <div class="checkbox-group" id="filters">
+      <label><input type="checkbox" value="牛">牛</label>
+      <label><input type="checkbox" value="辣">辣</label>
+      <label><input type="checkbox" value="炸">炸</label>
+      <label><input type="checkbox" value="甜">甜</label>
+      <label><input type="checkbox" value="魚">魚</label>
+      <label><input type="checkbox" value="生">生</label>
+    </div>
+    <button onclick="recommendByCategory()">推薦餐點</button>
+    <div class="result" id="category-result"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🎰 吃角子老虎機推薦</div>
+    <button onclick="startSlot()">開始轉動</button>
+    <button onclick="stopSlot()">停止</button>
+    <div class="slot-box" id="slot-box">🍱🍜🍟</div>
+    <div class="slot-result" id="slot-result"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🍽 吃什麼大轉盤</div>
+    <canvas id="wheelCanvas" width="360" height="360"></canvas>
+    <button onclick="startSpin()">開始轉！</button>
+  </div>
+</div>
+<audio id="ding" src="https://freesound.org/data/previews/341/341695_3248244-lq.mp3"></audio>
+
+<script defer>
+  const filters = () => Array.from(document.querySelectorAll('#filters input:checked')).map(cb => cb.value);
+
+  const categoryData = {
+    "中餐": ["宮保雞丁", "紅燒牛肉麵", "三杯雞", "滷肉飯", "炒米粉"],
+    "西餐": ["牛排", "焗烤馬鈴薯", "義大利麵", "奶油燉飯", "起司漢堡"],
+    "日式": ["拉麵", "壽司", "咖哩飯", "炸豬排", "親子丼"],
+    "韓式": ["石鍋拌飯", "韓式炸雞", "部隊鍋", "泡菜炒飯", "辣炒年糕"],
+    "泰式": ["打拋豬", "綠咖哩", "月亮蝦餅", "泰式酸辣湯", "椰汁雞肉飯"],
+    "甜點": ["珍珠奶茶", "抹茶蛋糕", "芋泥球", "冰淇淋鬆餅", "千層蛋糕"],
+    "小吃": ["鹽酥雞", "蚵仔煎", "大腸麵線", "米血", "臭豆腐"],
+    "速食": ["麥當勞", "肯德基", "漢堡王", "摩斯漢堡", "頂呱呱"]
+  };
+
+  function recommendByCategory() {
+    const cuisine = document.getElementById("cuisine").value;
+    const blacklist = filters();
+    const options = categoryData[cuisine] || [];
+    const filtered = options.filter(item => !blacklist.some(b => item.includes(b)));
+    const chosen = filtered[Math.floor(Math.random() * filtered.length)];
+    document.getElementById("category-result").innerHTML = chosen ? `推薦你吃：<strong>${chosen}</strong><br><a class="link" href="https://www.google.com/search?q=${encodeURIComponent(chosen + ' 附近')}" target="_blank">搜尋附近的「${chosen}」</a>` : "找不到符合的餐點，請重新選擇。";
+  }
+
+  const slotDishes = ["壽司", "火鍋", "牛排", "炒飯", "拉麵", "炸雞", "水餃", "鹽酥雞", "義大利麵", "蚵仔煎"];
+  let slotTimer, currentSlotResult = "", isSpinning = false;
+
+  function startSlot() {
+    if (isSpinning) return;
+    isSpinning = true;
+    const blacklist = filters();
+    const validOptions = slotDishes.filter(dish => !blacklist.some(b => dish.includes(b)));
+    if (validOptions.length === 0) {
+      document.getElementById("slot-box").textContent = "😵 沒有可選項目";
+      document.getElementById("slot-result").innerHTML = "請取消一些『不想吃的』再試試～";
+      isSpinning = false;
+      return;
+    }
+    slotTimer = setInterval(() => {
+      const random = validOptions[Math.floor(Math.random() * validOptions.length)];
+      document.getElementById("slot-box").textContent = random;
+      currentSlotResult = random;
+    }, 80);
+    document.getElementById("slot-result").innerHTML = "";
+  }
+
+  function stopSlot() {
+    if (!isSpinning) return;
+    clearInterval(slotTimer);
+    const chosen = currentSlotResult;
+    document.getElementById("ding").play();
+    document.getElementById("slot-result").innerHTML = `你抽中了：<strong>${chosen}</strong><br><a class="link" href="https://www.google.com/search?q=${encodeURIComponent(chosen + ' 附近')}" target="_blank">搜尋附近的「${chosen}」</a>`;
+    isSpinning = false;
+  }
+
+  const wheel = new Winwheel({
+    canvasId: 'wheelCanvas',
+    numSegments: slotDishes.length,
+    outerRadius: 160,
+    textFontSize: 16,
+    segments: slotDishes.map(f => ({ fillStyle: getRandomColor(), text: f })),
+    animation: {
+      type: 'spinToStop',
+      duration: 5,
+      spins: 8,
+      callbackFinished: function (segment) {
+        alert(`今晚就吃「${segment.text}」吧！`);
+      }
+    }
+  });
+
+  function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) color += letters[Math.floor(Math.random() * 16)];
+    return color;
+  }
+
+  function startSpin() {
+    wheel.stopAnimation(false);
+    wheel.rotationAngle = 0;
+    wheel.startAnimation();
+  }
+</script>
+</body>
+</html>
